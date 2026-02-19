@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, ChatSession } from "@google/genai";
+import { GoogleGenAI, Chat } from "@google/genai";
 import { MarkdownContent } from './MarkdownContent';
 import { View } from '../types';
 import { Send, User, Bot, Loader2, BrainCircuit, CalendarRange, ChevronRight, Trash2, MessageSquarePlus } from 'lucide-react';
@@ -36,9 +36,9 @@ Example: [[PRACTICE:Newton's Second Law]] or [[PLANNER:Mastering Organic Chemist
 Only include these if they are genuinely helpful next steps based on the current doubt.
 `;
 
-const INITIAL_MESSAGE: Message = { 
-  id: '1', 
-  role: 'model', 
+const INITIAL_MESSAGE: Message = {
+  id: '1',
+  role: 'model',
   text: 'Hi! I am your AI Tutor. Stuck on a problem? Ask me anything!',
   timestamp: Date.now()
 };
@@ -48,14 +48,14 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const chatSessionRef = useRef<ChatSession | null>(null);
+
+  const chatSessionRef = useRef<Chat | null>(null);
 
   // Initialize: Load from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     let initialMessages = [INITIAL_MESSAGE];
-    
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -89,11 +89,11 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
       }));
 
     chatSessionRef.current = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        history: history,
-        config: {
-            systemInstruction: `You are a friendly, encouraging, and highly knowledgeable tutor. Explain concepts simply. ${LATEX_INSTRUCTION} ${SUGGESTION_INSTRUCTION}`,
-        }
+      model: "gemini-2.0-flash",
+      history: history,
+      config: {
+        systemInstruction: `You are a friendly, encouraging, and highly knowledgeable tutor. Explain concepts simply. ${LATEX_INSTRUCTION} ${SUGGESTION_INSTRUCTION}`,
+      }
     });
   };
 
@@ -134,13 +134,13 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
   const handleSend = async () => {
     if (!input.trim() || !chatSessionRef.current) return;
 
-    const userMsg: Message = { 
-      id: Date.now().toString(), 
-      role: 'user', 
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      role: 'user',
       text: input,
       timestamp: Date.now()
     };
-    
+
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
@@ -148,12 +148,12 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
     try {
       const result = await chatSessionRef.current.sendMessage({ message: userMsg.text });
       const modelText = result.text || "";
-      
+
       const { cleanText, suggestions } = parseSuggestions(modelText);
 
-      const botMsg: Message = { 
-        id: (Date.now() + 1).toString(), 
-        role: 'model', 
+      const botMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'model',
         text: cleanText || "I'm having trouble thinking right now.",
         suggestions: suggestions.length > 0 ? suggestions : undefined,
         timestamp: Date.now()
@@ -161,9 +161,9 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
       setMessages(prev => [...prev, botMsg]);
     } catch (error) {
       console.error("Chat error", error);
-      setMessages(prev => [...prev, { 
-        id: Date.now().toString(), 
-        role: 'model', 
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
         text: "Sorry, I encountered an error. Please try again.",
         timestamp: Date.now()
       }]);
@@ -177,19 +177,19 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
       <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
-           <div className="flex items-center gap-2">
-             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-             <span className="font-semibold text-slate-700">Live Tutor</span>
-           </div>
-           <div className="flex items-center gap-2">
-             <button 
-                onClick={clearHistory}
-                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                title="Clear Chat History"
-             >
-               <Trash2 size={18} />
-             </button>
-           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+            <span className="font-semibold text-slate-700">Live Tutor</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={clearHistory}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+              title="Clear Chat History"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -200,10 +200,10 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
               <p>Start a new conversation</p>
             </div>
           )}
-          
+
           {messages.map((msg) => (
-            <div 
-              key={msg.id} 
+            <div
+              key={msg.id}
               className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
               <div className={`
@@ -215,8 +215,8 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
               <div className={`max-w-[85%] space-y-3 ${msg.role === 'user' ? 'flex flex-col items-end' : ''}`}>
                 <div className={`
                   p-4 rounded-2xl text-sm leading-relaxed
-                  ${msg.role === 'user' 
-                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100' 
+                  ${msg.role === 'user'
+                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-md shadow-indigo-100'
                     : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none shadow-sm'}
                 `}>
                   {msg.role === 'user' ? (
@@ -232,7 +232,7 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
                     {msg.suggestions.map((suggestion, sIdx) => (
                       <button
                         key={sIdx}
-                        onClick={() => suggestion.type === 'PRACTICE' 
+                        onClick={() => suggestion.type === 'PRACTICE'
                           ? onNavigate('practice', { topic: suggestion.topic })
                           : onNavigate('planner', { goal: suggestion.topic })
                         }
@@ -254,8 +254,8 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
                 <Bot size={16} />
               </div>
               <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
-                 <Loader2 className="animate-spin text-indigo-500" size={18} />
-                 <span className="text-xs text-slate-400 font-medium">Sparking ideas...</span>
+                <Loader2 className="animate-spin text-indigo-500" size={18} />
+                <span className="text-xs text-slate-400 font-medium">Sparking ideas...</span>
               </div>
             </div>
           )}

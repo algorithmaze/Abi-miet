@@ -14,10 +14,10 @@ const cleanJson = (text: string) => {
 export const generateQuestion = async (
   topic: string,
   difficulty: Difficulty,
-  examType: ExamType = 'General'
+  examType: ExamType
 ): Promise<Question> => {
-  const modelId = "gemini-3-flash-preview";
-  
+  const modelId = "gemini-2.0-flash";
+
   let promptContext = "";
   if (examType === 'JEE') {
     promptContext = "The question should be suitable for the Joint Entrance Examination (JEE) for engineering aspirants. Focus on Physics, Chemistry, or Mathematics concepts at a high school/pre-university level.";
@@ -26,7 +26,7 @@ export const generateQuestion = async (
   } else if (examType === 'UPSC') {
     promptContext = "The question should be suitable for the Union Public Service Commission (UPSC) Civil Services Preliminary exam. Focus on General Studies, History, Polity, Geography, or Current Affairs.";
   } else {
-    promptContext = "General academic knowledge.";
+    promptContext = "Academic knowledge for competitive exams.";
   }
 
   const prompt = `
@@ -41,14 +41,14 @@ export const generateQuestion = async (
 
   const response = await ai.models.generateContent({
     model: modelId,
-    contents: prompt,
+    contents: [{ parts: [{ text: prompt }] }],
     config: {
       responseMimeType: "application/json",
       responseSchema: {
         type: Type.OBJECT,
         properties: {
           question: { type: Type.STRING },
-          options: { 
+          options: {
             type: Type.ARRAY,
             items: { type: Type.STRING }
           },
@@ -63,6 +63,11 @@ export const generateQuestion = async (
   });
 
   const rawText = response.text || "{}";
+  console.log("Raw API Response:", rawText);
+  if (rawText === "{}") {
+    console.error("Empty response from AI model");
+    throw new Error("Empty response from AI");
+  }
   const data = JSON.parse(cleanJson(rawText));
 
   return {
@@ -82,8 +87,8 @@ export const generateStudyPlan = async (
   days: number,
   hoursPerDay: number
 ): Promise<StudyTask[]> => {
-  const modelId = "gemini-3-flash-preview";
-  
+  const modelId = "gemini-2.0-flash";
+
   const prompt = `
     Create a ${days}-day study plan for a student who wants to master "${goal}".
     They have ${hoursPerDay} hours per day.
@@ -92,7 +97,7 @@ export const generateStudyPlan = async (
 
   const response = await ai.models.generateContent({
     model: modelId,
-    contents: prompt,
+    contents: [{ parts: [{ text: prompt }] }],
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -102,8 +107,8 @@ export const generateStudyPlan = async (
           properties: {
             day: { type: Type.STRING, description: "e.g., Day 1" },
             focus: { type: Type.STRING, description: "Main topic of the day" },
-            tasks: { 
-              type: Type.ARRAY, 
+            tasks: {
+              type: Type.ARRAY,
               items: { type: Type.STRING }
             }
           },
@@ -117,23 +122,28 @@ export const generateStudyPlan = async (
   return JSON.parse(cleanJson(rawText));
 };
 
-export const getDoubtSolution = async (history: {role: string, parts: {text: string}[]}[]): Promise<string> => {
-    // We use chat for doubts
-    const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        history: history,
-        config: {
-            systemInstruction: `You are an expert tutor. Answer questions clearly, concisely, and encourage the student. ${LATEX_INSTRUCTION}`,
-        }
-    });
-    
-    // Logic is handled by the component using the chat object
-    return ""; 
+export const getDoubtSolution = async (history: { role: string, parts: { text: string }[] }[]): Promise<string> => {
+  // We use chat for doubts
+  const chat = ai.chats.create({
+    model: "gemini-2.0-flash",
+    history: history,
+    config: {
+      systemInstruction: `You are an expert tutor for JEE, NEET, and UPSC exams. 
+            CRITICAL RULES:
+            1. ONLY answer questions related to JEE (Physics, Chemistry, Maths), NEET (Physics, Chemistry, Biology), or UPSC (History, Geography, Polity, Economics, Science, Environment).
+            2. If a user asks anything general, non-academic, or unrelated to these exams (e.g., jokes, sports, entertainment, general conversation), politely steer them back to their studies. 
+            3. Use LaTeX for ALL mathematical expressions ($...$ for inline, $$...$$ for block).
+            4. Keep responses high-quality and textbook-like.`,
+    }
+  });
+
+  // Logic is handled by the component using the chat object
+  return "";
 };
 
 export const generateVoiceExplanation = async (text: string): Promise<string | undefined> => {
-  const modelId = "gemini-2.5-flash-preview-tts";
-  
+  const modelId = "gemini-2.0-flash"; // Or another valid multimodal/audio model
+
   try {
     const response = await ai.models.generateContent({
       model: modelId,
@@ -149,8 +159,9 @@ export const generateVoiceExplanation = async (text: string): Promise<string | u
     });
 
     return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  } catch (e) {
+  } catch (e: any) {
     console.error("Voice generation failed", e);
+    console.error("Error details:", e?.message, e?.stack);
     return undefined;
   }
 };

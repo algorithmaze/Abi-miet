@@ -3,24 +3,86 @@ import { generateQuestion, generateVoiceExplanation } from '../services/geminiSe
 import { decode, decodeAudioData, playAudioBuffer } from '../services/audioUtils';
 import { Question, Difficulty, ExamType } from '../types';
 import { MarkdownContent } from './MarkdownContent';
-import { 
-  Play, 
-  CheckCircle2, 
-  XCircle, 
-  ArrowRight, 
-  Loader2, 
-  Volume2, 
+import {
+  Play,
+  CheckCircle2,
+  XCircle,
+  ArrowRight,
+  Loader2,
+  Volume2,
   Settings2,
   Trophy,
+  Eye,
+  Book,
+  ChevronDown,
   Target,
-  BookOpen,
-  RotateCcw,
-  Sparkles,
-  ClipboardCheck,
   Zap,
-  ChevronRight,
-  Eye
+  ClipboardCheck,
+  RotateCcw,
+  BookOpen,
+  Sparkles,
+  ChevronRight
 } from 'lucide-react';
+
+const SYLLABUS = {
+  JEE: {
+    Physics: [
+      "Kinematics", "Laws of Motion", "Work, Energy and Power", "Rotational Motion",
+      "Gravitation", "Properties of Solids and Liquids", "Thermodynamics",
+      "Oscillations and Waves", "Electrostatics", "Current Electricity",
+      "Magnetic Effects of Current", "Electromagnetic Induction", "Optics",
+      "Dual Nature of Matter", "Atoms and Nuclei", "Electronic Devices"
+    ],
+    Chemistry: [
+      "Some Basic Concepts", "Atomic Structure", "Chemical Bonding", "Thermodynamics",
+      "Solutions", "Equilibrium", "Redox Reactions", "Chemical Kinetics",
+      "P-Block Elements", "d- and f-Block Elements", "Coordination Compounds",
+      "Purification of Organic Compounds", "Hydrocarbons", "Organic Compounds with Halogens",
+      "Organic Compounds with Oxygen", "Organic Compounds with Nitrogen", "Biomolecules"
+    ],
+    Mathematics: [
+      "Sets, Relations and Functions", "Complex Numbers", "Matrices and Determinants",
+      "Permutations and Combinations", "Binomial Theorem", "Sequences and Series",
+      "Limit, Continuity and Differentiability", "Integral Calculus", "Differential Equations",
+      "Coordinate Geometry", "Three Dimensional Geometry", "Vector Algebra",
+      "Statistics and Probability", "Trigonometry"
+    ]
+  },
+  NEET: {
+    Physics: [
+      "Physical World and Measurement", "Kinematics", "Laws of Motion",
+      "Work, Energy and Power", "Motion of System of Particles", "Gravitation",
+      "Properties of Bulk Matter", "Thermodynamics", "Kinetic Theory of Gases",
+      "Oscillations and Waves", "Electrostatics", "Current Electricity",
+      "Magnetic Effects of Current", "Electromagnetic Induction", "Electromagnetic Waves",
+      "Optics", "Dual Nature of Matter", "Atoms and Nuclei", "Electronic Devices"
+    ],
+    Chemistry: [
+      "Basic Concepts of Chemistry", "Structure of Atom", "Classification of Elements",
+      "Chemical Bonding", "States of Matter", "Thermodynamics", "Equilibrium",
+      "Redox Reactions", "Hydrogen", "s-Block Elements", "p-Block Elements",
+      "Organic Chemistry Principles", "Hydrocarbons", "Environmental Chemistry",
+      "Solid State", "Solutions", "Electrochemistry", "Chemical Kinetics",
+      "Surface Chemistry", "General Principles of Isolation", "d and f Block Elements",
+      "Coordination Compounds", "Haloalkanes and Haloarenes", "Alcohols, Phenols and Ethers",
+      "Aldehydes, Ketones and Carboxylic Acids", "Organic Compounds with Nitrogen",
+      "Biomolecules", "Polymers", "Chemistry in Everyday Life"
+    ],
+    Biology: [
+      "Diversity in Living World", "Structural Organisation in Animals and Plants",
+      "Cell Structure and Function", "Plant Physiology", "Human Physiology",
+      "Reproduction", "Genetics and Evolution", "Biology and Human Welfare",
+      "Biotechnology and Its Applications", "Ecology and Environment"
+    ]
+  },
+  UPSC: {
+    "General Studies": [
+      "Current Events", "History of India", "Indian National Movement",
+      "Indian and World Geography", "Indian Polity and Governance", "Economic and Social Development",
+      "Environmental Ecology", "Biodiversity and Climate Change", "General Science"
+    ]
+  }
+};
 
 type SessionMode = 'setup' | 'quiz' | 'summary';
 
@@ -37,10 +99,25 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
   // Session Configuration
   const [mode, setMode] = useState<SessionMode>('setup');
   const [examType, setExamType] = useState<ExamType>('JEE');
-  const [topic, setTopic] = useState(initialTopic || '');
+  const [subject, setSubject] = useState('');
+  const [topic, setTopic] = useState('');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.MEDIUM);
   const [totalQuestions, setTotalQuestions] = useState(5);
   const [isQuizMode, setIsQuizMode] = useState(false);
+
+  useEffect(() => {
+    const subjects = Object.keys(SYLLABUS[examType as keyof typeof SYLLABUS]);
+    setSubject(subjects[0]);
+    setTopic((SYLLABUS[examType as keyof typeof SYLLABUS] as any)[subjects[0]][0]);
+  }, [examType]);
+
+  // Adjust topic when subject changes
+  useEffect(() => {
+    const examData = SYLLABUS[examType as keyof typeof SYLLABUS] as any;
+    if (subject && examData[subject]) {
+      setTopic(examData[subject][0]);
+    }
+  }, [subject, examType]);
 
   // Update topic if initialTopic changes (e.g., navigating from doubts)
   useEffect(() => {
@@ -58,7 +135,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [history, setHistory] = useState<AnswerHistory[]>([]);
-  
+
   // Audio State
   const [isAudioLoading, setIsAudioLoading] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
@@ -92,7 +169,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
     setQuestion(null);
     setSelectedOption(null);
     setIsSubmitted(false);
-    
+
     try {
       const q = await generateQuestion(topic, diff, examType);
       setQuestion(q);
@@ -105,7 +182,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
 
   const handleSubmit = () => {
     if (selectedOption === null || !question) return;
-    
+
     if (isQuizMode) {
       handleNext();
     } else {
@@ -137,7 +214,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
   const playExplanation = async (text?: string) => {
     const explanationText = text || question?.explanation;
     if (!explanationText) return;
-    
+
     setIsAudioLoading(true);
     try {
       const base64Audio = await generateVoiceExplanation(explanationText);
@@ -176,17 +253,20 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
               <Target size={20} className="text-indigo-600" /> Select Exam
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              {(['JEE', 'NEET', 'UPSC', 'General'] as ExamType[]).map((type) => (
+              {(['JEE', 'NEET', 'UPSC'] as ExamType[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => setExamType(type)}
                   className={`
-                    p-4 rounded-xl border-2 text-sm font-medium transition-all
-                    ${examType === type 
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700' 
-                      : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-300'}
+                    p-4 rounded-xl border-2 text-sm font-bold transition-all relative overflow-hidden group
+                    ${examType === type
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md'
+                      : 'border-slate-100 bg-slate-50 text-slate-500 hover:border-slate-300'}
                   `}
                 >
+                  <div className={`absolute top-0 right-0 p-1 ${examType === type ? 'opacity-100' : 'opacity-0'}`}>
+                    <CheckCircle2 size={14} className="text-indigo-600" />
+                  </div>
                   {type}
                 </button>
               ))}
@@ -194,21 +274,48 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
           </div>
 
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Topic / Subject</label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder={examType === 'JEE' ? "e.g., Rotational Motion" : examType === 'UPSC' ? "e.g., Indian Polity" : "e.g., Photosynthesis"}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
-              />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                  <Book size={16} className="text-indigo-500" /> Select Subject
+                </label>
+                <div className="relative">
+                  <select
+                    value={subject}
+                    onChange={(e) => setSubject(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm appearance-none font-medium text-slate-700 cursor-pointer"
+                  >
+                    {Object.keys(SYLLABUS[examType as keyof typeof SYLLABUS]).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                  <Target size={16} className="text-indigo-500" /> Specific Topic
+                </label>
+                <div className="relative">
+                  <select
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm appearance-none font-medium text-slate-700 cursor-pointer"
+                  >
+                    {(SYLLABUS[examType as keyof typeof SYLLABUS] as any)[subject]?.map((t: string) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Difficulty</label>
-                <select 
+                <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as Difficulty)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
@@ -220,7 +327,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Total Questions</label>
-                <select 
+                <select
                   value={totalQuestions}
                   onChange={(e) => setTotalQuestions(Number(e.target.value))}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
@@ -279,7 +386,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
             {isQuizMode ? 'Exam Completed!' : 'Practice Session Complete!'}
           </h2>
           <p className="text-slate-500 mb-8">Subject: {topic} ({examType})</p>
-          
+
           <div className="grid grid-cols-3 gap-4 mb-8">
             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Score</p>
@@ -335,17 +442,17 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
                 </div>
 
                 <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-100 ml-12">
-                   <div className="flex items-center justify-between mb-2">
-                     <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Explanation</span>
-                     <button 
-                        onClick={() => playExplanation(item.question.explanation)}
-                        className="text-indigo-600 hover:text-indigo-800"
-                        title="Listen to explanation"
-                     >
-                       <Volume2 size={16} />
-                     </button>
-                   </div>
-                   <MarkdownContent content={item.question.explanation} className="text-sm text-slate-700 leading-relaxed" />
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-indigo-700 uppercase tracking-wider">Explanation</span>
+                    <button
+                      onClick={() => playExplanation(item.question.explanation)}
+                      className="text-indigo-600 hover:text-indigo-800"
+                      title="Listen to explanation"
+                    >
+                      <Volume2 size={16} />
+                    </button>
+                  </div>
+                  <MarkdownContent content={item.question.explanation} className="text-sm text-slate-700 leading-relaxed" />
                 </div>
               </div>
             ))}
@@ -360,18 +467,18 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
           <div className="flex items-center gap-4">
-             <div className={`
+            <div className={`
                px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wide
-               ${examType === 'JEE' ? 'bg-red-100 text-red-700' : 
-                 examType === 'NEET' ? 'bg-blue-100 text-blue-700' : 
-                 examType === 'UPSC' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}
+               ${examType === 'JEE' ? 'bg-red-100 text-red-700' :
+                examType === 'NEET' ? 'bg-blue-100 text-blue-700' :
+                  examType === 'UPSC' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}
              `}>
-               {examType}
-             </div>
-             <div>
-               <h3 className="font-semibold text-slate-800 text-sm truncate max-w-[150px] md:max-w-none">{topic}</h3>
-               <p className="text-xs text-slate-400">{difficulty} Level • {isQuizMode ? 'Quiz Mode' : 'Practice Mode'}</p>
-             </div>
+              {examType}
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800 text-sm truncate max-w-[150px] md:max-w-none">{topic}</h3>
+              <p className="text-xs text-slate-400">{difficulty} Level • {isQuizMode ? 'Quiz Mode' : 'Practice Mode'}</p>
+            </div>
           </div>
           <div className="text-right">
             <p className="text-xs text-slate-400 font-medium uppercase mb-1">Progress</p>
@@ -381,8 +488,8 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
           </div>
         </div>
         <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden shadow-inner">
-          <div 
-            className="bg-indigo-600 h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]" 
+          <div
+            className="bg-indigo-600 h-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]"
             style={{ width: `${((currentQuestionIndex + 1) / totalQuestions) * 100}%` }}
           />
         </div>
@@ -390,9 +497,9 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center h-80 bg-white rounded-3xl border border-slate-100 shadow-sm">
-           <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
-           <p className="text-slate-500 font-medium">Preparing Question {currentQuestionIndex + 1}...</p>
-           <p className="text-xs text-slate-400 mt-2">Tailoring to {examType} standards</p>
+          <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
+          <p className="text-slate-500 font-medium">Preparing Question {currentQuestionIndex + 1}...</p>
+          <p className="text-xs text-slate-400 mt-2">Tailoring to {examType} standards</p>
         </div>
       ) : question ? (
         <div className="bg-white rounded-3xl shadow-lg shadow-slate-100 border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300">
@@ -403,7 +510,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
               {question.options.map((opt, idx) => {
                 const isSelected = selectedOption === idx;
                 const isCorrect = question.correctIndex === idx;
-                
+
                 let containerClass = "border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm";
                 if (isSubmitted) {
                   if (isCorrect) containerClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
@@ -433,19 +540,19 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
             {!isQuizMode && isSubmitted && (
               <div className={`mt-8 p-6 rounded-2xl border animate-in fade-in slide-in-from-bottom-2 duration-300 ${selectedOption === question.correctIndex ? 'bg-green-50 border-green-100' : 'bg-indigo-50/50 border-indigo-100'}`}>
                 <div className="flex items-center justify-between mb-3">
-                   <h4 className={`font-bold flex items-center gap-2 ${selectedOption === question.correctIndex ? 'text-green-800' : 'text-slate-800'}`}>
-                     <BookOpen size={18} className={selectedOption === question.correctIndex ? 'text-green-600' : 'text-indigo-600'} /> 
-                     Explanation
-                   </h4>
-                   {selectedOption === question.correctIndex && (
-                     <div className="flex items-center gap-1 text-green-600 text-xs font-bold uppercase tracking-wider">
-                       <Sparkles size={14} /> Correct!
-                     </div>
-                   )}
+                  <h4 className={`font-bold flex items-center gap-2 ${selectedOption === question.correctIndex ? 'text-green-800' : 'text-slate-800'}`}>
+                    <BookOpen size={18} className={selectedOption === question.correctIndex ? 'text-green-600' : 'text-indigo-600'} />
+                    Explanation
+                  </h4>
+                  {selectedOption === question.correctIndex && (
+                    <div className="flex items-center gap-1 text-green-600 text-xs font-bold uppercase tracking-wider">
+                      <Sparkles size={14} /> Correct!
+                    </div>
+                  )}
                 </div>
-                <MarkdownContent 
-                  content={question.explanation} 
-                  className={`${selectedOption === question.correctIndex ? 'text-green-900' : 'text-slate-700'} leading-relaxed`} 
+                <MarkdownContent
+                  content={question.explanation}
+                  className={`${selectedOption === question.correctIndex ? 'text-green-900' : 'text-slate-700'} leading-relaxed`}
                 />
               </div>
             )}
@@ -469,8 +576,8 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
                     onClick={() => playExplanation()}
                     disabled={isAudioLoading}
                     className={`flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-bold text-lg border-2 transition-all w-full md:w-auto shadow-sm
-                      ${selectedOption === question.correctIndex 
-                        ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 shadow-green-100' 
+                      ${selectedOption === question.correctIndex
+                        ? 'bg-green-600 text-white border-green-600 hover:bg-green-700 shadow-green-100'
                         : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-100'}
                       disabled:opacity-50`}
                   >
@@ -490,7 +597,7 @@ export const Practice: React.FC<PracticeProps> = ({ initialTopic }) => {
         </div>
       ) : (
         <div className="text-center py-20 text-slate-400">
-           Something went wrong. Try reloading.
+          Something went wrong. Try reloading.
         </div>
       )}
     </div>

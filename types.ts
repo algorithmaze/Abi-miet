@@ -4,7 +4,7 @@ export enum Difficulty {
   HARD = 'Hard'
 }
 
-export type ExamType = 'JEE' | 'NEET' | 'UPSC' | 'General';
+export type ExamType = 'JEE' | 'NEET' | 'UPSC';
 
 export interface Question {
   id: string;
@@ -40,4 +40,4 @@ export interface StudyTask {
   focus: string;
 }
 
-export type View = 'dashboard' | 'practice' | 'doubts' | 'planner';
+export type View = 'practice' | 'doubts' | 'planner';

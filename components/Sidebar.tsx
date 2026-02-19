@@ -1,11 +1,11 @@
 import React from 'react';
 import { View } from '../types';
-import { 
-  LayoutDashboard, 
-  BrainCircuit, 
-  MessageCircleQuestion, 
-  CalendarRange, 
-  GraduationCap 
+import {
+  LayoutDashboard,
+  BrainCircuit,
+  MessageCircleQuestion,
+  CalendarRange,
+  GraduationCap
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -17,7 +17,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobileOpen, setIsMobileOpen }) => {
   const navItems: { id: View; label: string; icon: React.ReactNode }[] = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'practice', label: 'Adaptive Practice', icon: <BrainCircuit size={20} /> },
     { id: 'doubts', label: 'Doubt Solver', icon: <MessageCircleQuestion size={20} /> },
     { id: 'planner', label: 'Study Planner', icon: <CalendarRange size={20} /> },
@@ -27,7 +26,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobile
     <>
       {/* Mobile Overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-20 md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
@@ -58,8 +57,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobile
               }}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
-                ${currentView === item.id 
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-sm' 
+                ${currentView === item.id
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-sm'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
               `}
             >
@@ -73,17 +72,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, isMobile
           ))}
         </nav>
 
-        <div className="absolute bottom-0 w-full p-4 border-t border-slate-100 bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-md">
-              ST
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-700">Student Account</p>
-              <p className="text-xs text-slate-500">Premium Plan</p>
-            </div>
-          </div>
-        </div>
       </div>
     </>
   );
