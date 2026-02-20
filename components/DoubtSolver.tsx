@@ -4,7 +4,8 @@ import { MarkdownContent } from './MarkdownContent';
 import { View } from '../types';
 import { Send, User, Bot, Loader2, BrainCircuit, CalendarRange, ChevronRight, Trash2, MessageSquarePlus } from 'lucide-react';
 
-const apiKey = process.env.API_KEY || '';
+const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+console.log("DoubtSolver: API Key length:", apiKey ? apiKey.length : 0);
 const ai = new GoogleGenAI({ apiKey });
 
 interface Suggestion {
@@ -93,6 +94,8 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
       history: history,
       config: {
         systemInstruction: `You are a friendly, encouraging, and highly knowledgeable tutor. Explain concepts simply. ${LATEX_INSTRUCTION} ${SUGGESTION_INSTRUCTION}`,
+        temperature: 0.7,
+        maxOutputTokens: 2000,
       }
     });
   };
@@ -159,12 +162,22 @@ export const DoubtSolver: React.FC<DoubtSolverProps> = ({ onNavigate }) => {
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, botMsg]);
-    } catch (error) {
-      console.error("Chat error", error);
+    } catch (error: any) {
+      console.error("Chat error details:", error);
+      let errorMessage = "Sorry, I encountered an error. Please try again.";
+
+      if (error.message?.includes('400')) {
+        errorMessage = "I'm meant to be a helpful tutor. Please ask me something learning-related!";
+      } else if (error.message?.includes('429')) {
+        errorMessage = "I'm getting too many questions right now. Please wait a moment.";
+      } else if (error.message?.includes('500') || error.message?.includes('503')) {
+        errorMessage = "I'm having some server trouble. Please try again in a bit.";
+      }
+
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         role: 'model',
-        text: "Sorry, I encountered an error. Please try again.",
+        text: errorMessage,
         timestamp: Date.now()
       }]);
     } finally {

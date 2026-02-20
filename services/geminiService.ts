@@ -1,7 +1,10 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Question, Difficulty, StudyTask, ExamType } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+// Direct access for Vite textual replacement
+const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY || "";
+console.log("MindSpark AI: API Key length:", apiKey ? apiKey.length : 0);
+if (!apiKey) console.error("MindSpark AI: API Key is missing! Check .env.local");
 const ai = new GoogleGenAI({ apiKey });
 
 const LATEX_INSTRUCTION = "CRITICAL: Use LaTeX for ALL mathematical expressions, scientific formulas, and symbols. Use $...$ for inline math and $$...$$ for block math. Example: $E=mc^2$ or $\\frac{a}{b}$. Avoid plain text for formulas.";
@@ -16,6 +19,7 @@ export const generateQuestion = async (
   difficulty: Difficulty,
   examType: ExamType
 ): Promise<Question> => {
+  // Use 2.0 Flash as requested by user
   const modelId = "gemini-2.0-flash";
 
   let promptContext = "";
@@ -39,59 +43,82 @@ export const generateQuestion = async (
     Return strictly valid JSON.
   `;
 
-  const response = await ai.models.generateContent({
-    model: modelId,
-    contents: [{ parts: [{ text: prompt }] }],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          question: { type: Type.STRING },
-          options: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING }
+  try {
+    console.log(`MindSpark: Requesting question for ${topic} (${examType})`);
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "object",
+          properties: {
+            question: { type: "string" },
+            options: {
+              type: "array",
+              items: { type: "string" }
+            },
+            correctIndex: { type: "integer" },
+            explanation: { type: "string" },
+            topic: { type: "string" },
+            difficulty: { type: "string" }
           },
-          correctIndex: { type: Type.INTEGER, description: "0-based index of the correct option" },
-          explanation: { type: Type.STRING, description: "Detailed explanation of why the answer is correct" },
-          topic: { type: Type.STRING },
-          difficulty: { type: Type.STRING, enum: ["Easy", "Medium", "Hard"] }
-        },
-        required: ["question", "options", "correctIndex", "explanation", "topic", "difficulty"]
+          required: ["question", "options", "correctIndex", "explanation", "topic", "difficulty"]
+        }
       }
+    });
+
+    const rawText = response.text || "{}";
+    console.log("MindSpark: Raw API Response:", rawText);
+
+    if (rawText === "{}") {
+      throw new Error("Empty response from AI model");
     }
-  });
 
-  const rawText = response.text || "{}";
-  console.log("Raw API Response:", rawText);
-  if (rawText === "{}") {
-    console.error("Empty response from AI model");
-    throw new Error("Empty response from AI");
+    const data = JSON.parse(cleanJson(rawText));
+
+    // Fallback for UUID if crypto.randomUUID is not available
+    const id = typeof crypto !== 'undefined' && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).substring(2, 11);
+
+    return {
+      id,
+      text: data.question,
+      options: data.options,
+      correctIndex: data.correctIndex,
+      explanation: data.explanation,
+      difficulty: data.difficulty as Difficulty,
+      topic: data.topic,
+      examType: examType
+    };
+  } catch (error: any) {
+    console.error("MindSpark: Question generation error:", error);
+    console.error("Error details:", error?.message, error?.stack);
+    throw error;
   }
-  const data = JSON.parse(cleanJson(rawText));
-
-  return {
-    id: crypto.randomUUID(),
-    text: data.question,
-    options: data.options,
-    correctIndex: data.correctIndex,
-    explanation: data.explanation,
-    difficulty: data.difficulty as Difficulty,
-    topic: data.topic,
-    examType: examType
-  };
 };
 
 export const generateStudyPlan = async (
   goal: string,
   days: number,
-  hoursPerDay: number
+  hoursPerDay: number,
+  subject?: string,
+  examType?: string
 ): Promise<StudyTask[]> => {
+  // Use 2.0 Flash as requested by user
   const modelId = "gemini-2.0-flash";
+
+  let specificContext = "";
+  if (subject && examType) {
+    specificContext = `Focus specifically on ${subject} for ${examType} syllabus.`;
+  }
 
   const prompt = `
     Create a ${days}-day study plan for a student who wants to master "${goal}".
     They have ${hoursPerDay} hours per day.
+    ${specificContext}
+    Ensure the tasks are relevant to the exam syllabus if specified.
     Return strictly valid JSON.
   `;
 
@@ -101,15 +128,15 @@ export const generateStudyPlan = async (
     config: {
       responseMimeType: "application/json",
       responseSchema: {
-        type: Type.ARRAY,
+        type: "array",
         items: {
-          type: Type.OBJECT,
+          type: "object",
           properties: {
-            day: { type: Type.STRING, description: "e.g., Day 1" },
-            focus: { type: Type.STRING, description: "Main topic of the day" },
+            day: { type: "string" },
+            focus: { type: "string" },
             tasks: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
+              type: "array",
+              items: { type: "string" }
             }
           },
           required: ["day", "focus", "tasks"]
@@ -149,7 +176,7 @@ export const generateVoiceExplanation = async (text: string): Promise<string | u
       model: modelId,
       contents: [{ parts: [{ text }] }],
       config: {
-        responseModalities: [Modality.AUDIO],
+        responseModalities: ["audio"],
         speechConfig: {
           voiceConfig: {
             prebuiltVoiceConfig: { voiceName: 'Kore' },

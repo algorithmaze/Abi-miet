@@ -1,31 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import { generateStudyPlan } from '../services/geminiService';
-import { StudyTask } from '../types';
-import { Calendar, Clock, BookOpen, Loader2, Plus } from 'lucide-react';
+import { StudyTask, ExamType } from '../types';
+import { SYLLABUS } from '../utils/syllabus';
+import { Calendar, Clock, BookOpen, Loader2, Plus, Target, Book, ChevronDown } from 'lucide-react';
 
 interface PlannerProps {
   initialGoal?: string;
 }
 
 export const Planner: React.FC<PlannerProps> = ({ initialGoal }) => {
-  const [goal, setGoal] = useState(initialGoal || 'Master Linear Algebra');
+  const [goal, setGoal] = useState(initialGoal || '');
+  const [examType, setExamType] = useState<ExamType>('JEE');
+  const [subject, setSubject] = useState('');
+  const [topic, setTopic] = useState('');
   const [days, setDays] = useState(5);
   const [hours, setHours] = useState(2);
   const [plan, setPlan] = useState<StudyTask[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Update goal if initialGoal changes
+  // Initialize subject/topic based on exam type defaults
+  useEffect(() => {
+    const subjects = Object.keys(SYLLABUS[examType as keyof typeof SYLLABUS]);
+    if (subjects.length > 0) {
+      setSubject(subjects[0]);
+      setTopic((SYLLABUS[examType as keyof typeof SYLLABUS] as any)[subjects[0]][0]);
+    }
+  }, [examType]);
+
+  // Update topic list when subject changes
+  useEffect(() => {
+    const examData = SYLLABUS[examType as keyof typeof SYLLABUS] as any;
+    if (subject && examData[subject]) {
+      setTopic(examData[subject][0]);
+    }
+  }, [subject, examType]);
+
+  // Update goal if initialGoal changes (e.g. from Practice)
   useEffect(() => {
     if (initialGoal) {
       setGoal(initialGoal);
-      setPlan(null); // Clear previous plan to encourage re-generation
+      setPlan(null);
     }
   }, [initialGoal]);
 
   const handleGenerate = async () => {
     setLoading(true);
     try {
-      const generatedPlan = await generateStudyPlan(goal, days, hours);
+      const targetGoal = goal.trim() || `Master ${topic}`;
+      const generatedPlan = await generateStudyPlan(targetGoal, days, hours, subject, examType);
       setPlan(generatedPlan);
     } catch (e) {
       console.error(e);
@@ -45,50 +67,106 @@ export const Planner: React.FC<PlannerProps> = ({ initialGoal }) => {
         {/* Configuration Panel */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-             <div className="space-y-4">
-               <div>
-                 <label className="block text-sm font-medium text-slate-700 mb-1">Learning Goal</label>
-                 <input 
-                    type="text" 
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="e.g. Learn React Native"
-                 />
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Duration (Days)</label>
-                    <input 
-                        type="number" 
-                        value={days}
-                        onChange={(e) => setDays(Number(e.target.value))}
-                        min={1} max={30}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Hours / Day</label>
-                    <input 
-                        type="number" 
-                        value={hours}
-                        onChange={(e) => setHours(Number(e.target.value))}
-                        min={1} max={12}
-                        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                    />
-                  </div>
-               </div>
+            <div className="space-y-4">
+              {/* Exam Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Exam Type</label>
+                <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200">
+                  {(['JEE', 'NEET', 'UPSC'] as ExamType[]).map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => setExamType(type)}
+                      className={`
+                          flex-1 py-1.5 text-xs font-bold rounded-lg transition-all
+                          ${examType === type
+                          ? 'bg-white text-indigo-700 shadow-sm border border-slate-100'
+                          : 'text-slate-500 hover:text-slate-700'}
+                        `}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-               <button
-                 onClick={handleGenerate}
-                 disabled={loading}
-                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-               >
-                 {loading ? <Loader2 className="animate-spin" size={18} /> : <Calendar size={18} />}
-                 Generate Plan
-               </button>
-             </div>
+              {/* Subject & Topic Selection */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Subject</label>
+                  <div className="relative">
+                    <select
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm appearance-none font-medium text-slate-700 pointer-events-auto"
+                    >
+                      {Object.keys(SYLLABUS[examType as keyof typeof SYLLABUS]).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Focused Topic</label>
+                  <div className="relative">
+                    <select
+                      value={topic}
+                      onChange={(e) => setTopic(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm appearance-none font-medium text-slate-700 pointer-events-auto"
+                    >
+                      {(SYLLABUS[examType as keyof typeof SYLLABUS] as any)[subject]?.map((t: string) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Specific Goal (Optional)</label>
+                <input
+                  type="text"
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder={`e.g. Master ${topic} problems`}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Duration (Days)</label>
+                  <input
+                    type="number"
+                    value={days}
+                    onChange={(e) => setDays(Number(e.target.value))}
+                    min={1} max={30}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Hours / Day</label>
+                  <input
+                    type="number"
+                    value={hours}
+                    onChange={(e) => setHours(Number(e.target.value))}
+                    min={1} max={12}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleGenerate}
+                disabled={loading}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+              >
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <Calendar size={18} />}
+                Generate Plan
+              </button>
+            </div>
           </div>
         </div>
 
@@ -112,7 +190,7 @@ export const Planner: React.FC<PlannerProps> = ({ initialGoal }) => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2 pl-14">
                     {dayPlan.tasks.map((task, tIdx) => (
                       <div key={tIdx} className="flex items-start gap-2 text-sm text-slate-600">
@@ -126,8 +204,8 @@ export const Planner: React.FC<PlannerProps> = ({ initialGoal }) => {
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 min-h-[300px]">
-               <BookOpen size={48} className="mb-4 opacity-20" />
-               <p>Your personalized study roadmap will appear here.</p>
+              <BookOpen size={48} className="mb-4 opacity-20" />
+              <p>Your personalized study roadmap will appear here.</p>
             </div>
           )}
         </div>
